@@ -1,14 +1,25 @@
 const { fetchData, update } = require("./util.js");
-const { defaultTime, requestOptions } = require("./config.json");
 const EventEmitter = require("events");
+
+const defaultOptions = {
+  defaultTime: 60000,
+  requestOptions: {
+    headers: {
+      "accept-language": "en-US",
+      "accept-encoding": "gzip",
+    },
+    responseType: "json",
+    timeout: 10000,
+  },
+};
 
 class GitCord extends EventEmitter {
   constructor(
     username,
     {
       auth,
-      intervalTime = defaultTime,
-      customRequestOptions = requestOptions,
+      intervalTime = defaultOptions.defaultTime,
+      customRequestOptions = defaultOptions.requestOptions,
       all = false,
       force = false,
       collection = [],
@@ -20,17 +31,21 @@ class GitCord extends EventEmitter {
         "'all' option needs to be enabled or you need to add repositories for feeds!"
       );
     if (typeof repositories == "string") repositories = [repositories];
-    if (auth) requestOptions.headers.Authorization = `token ${token}`;
+    if (auth)
+      defaultOptions.requestOptions.headers.Authorization = `token ${token}`;
 
     super();
 
     Object.assign(this, {
       username,
       intervalTime,
-      customRequestOptions,
       all,
       collection,
       force,
+      customRequestOptions: Object.assign(
+        defaultOptions.requestOptions,
+        customRequestOptions
+      ),
       events: {},
     });
   }
@@ -49,11 +64,7 @@ class GitCord extends EventEmitter {
       });
 
     const intervalID = setInterval(() => {
-      if (!this.repositories.length)
-        return (
-          clearInterval(intervalID) &&
-          console.warn("GitCord has stopped checking the feeds!")
-        );
+      if (!this.repositories.length) return clearInterval(intervalID);
       update(this);
     }, this.intervalTime);
   }
@@ -65,11 +76,11 @@ class GitCord extends EventEmitter {
       fetchData(this, {
         type: "repositoryData",
         name: repository,
-        customRequestOptions,
         callback: (eventsData) =>
           (this.events[repository] = eventsData.map((event) => event.id)),
       });
-      !this.repositories.includes(repo) ? this.repositories.push(repo) : "";
+      if (!this.repositories.includes(repository))
+        this.repositories.push(repository);
     }
 
     return true;
